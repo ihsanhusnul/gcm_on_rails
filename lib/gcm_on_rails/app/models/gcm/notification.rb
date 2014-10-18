@@ -35,6 +35,7 @@ class Gcm::Notification < Gcm::Base
       else
         format = "json"
       end
+      logger.info "notifications = #{notifications}"
 
       unless notifications.nil? || notifications.empty?
         api_key = Gcm::Connection.open

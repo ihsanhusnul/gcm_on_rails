@@ -41,63 +41,64 @@ class Gcm::Notification < Gcm::Base
         api_key = Gcm::Connection.open
         if api_key
           notifications.each do |notification|
-            send_notification notification
+            notification.send_notif api_key, format
           end
         end
       end
     end
+  end
 
-    def send_notification notification
-      logger.info "notification = #{notification.inspect}"
-      response = Gcm::Connection.send_notification(notification, api_key, format)
-      logger.info "response = #{response.inspect}"
+  def send_notif(api_key, format)
+    notification = self
+    logger.info "notification = #{notification.inspect}"
+    response = Gcm::Connection.send_notification(notification, api_key, format)
+    logger.info "response = #{response.inspect}"
 
-      if response[:code] == 200
-        if response[:message].nil?
-          # TODO - Making this assumption might not be right. HTTP status code 200 does not really signify success
-          # if Gcm servers returned nil for the message
-          error = "success"
-        elsif format == "json"
-          error = ""
-          message_data = JSON.parse response[:message]
-          success = message_data['success']
-          error = message_data['results'][0]['error']  if success == 0
-        elsif format == "plain_text"   #format is plain text
-          message_data = response[:message]
-          error = response[:message].split('=')[1]
-        end
-
-
-        case error
-          when "MissingRegistration"
-            ex = Gcm::Errors::MissingRegistration.new(response[:message])
-            logger.warn("#{ex.message}, destroying gcm_device with id #{notification.device.id}")
-            notification.device.destroy
-          when "InvalidRegistration"
-            ex = Gcm::Errors::InvalidRegistration.new(response[:message])
-            logger.warn("#{ex.message}, destroying gcm_device with id #{notification.device.id}")
-            notification.device.destroy
-          when "MismatchedSenderId"
-            ex = Gcm::Errors::MismatchSenderId.new(response[:message])
-            logger.warn(ex.message)
-          when "NotRegistered"
-            ex = Gcm::Errors::NotRegistered.new(response[:message])
-            logger.warn("#{ex.message}, destroying gcm_device with id #{notification.device.id}")
-            notification.device.destroy
-          when "MessageTooBig"
-            ex = Gcm::Errors::MessageTooBig.new(response[:message])
-            logger.warn(ex.message)
-          else
-            notification.sent_at = Time.now
-            notification.save!
-        end
-      elsif response[:code] == 401
-        raise Gcm::Errors::InvalidAuthToken.new(message_data)
-      elsif response[:code] == 503
-        raise Gcm::Errors::ServiceUnavailable.new(message_data)
-      elsif response[:code] == 500
-        raise Gcm::Errors::InternalServerError.new(message_data)
+    if response[:code] == 200
+      if response[:message].nil?
+        # TODO - Making this assumption might not be right. HTTP status code 200 does not really signify success
+        # if Gcm servers returned nil for the message
+        error = "success"
+      elsif format == "json"
+        error = ""
+        message_data = JSON.parse response[:message]
+        success = message_data['success']
+        error = message_data['results'][0]['error']  if success == 0
+      elsif format == "plain_text"   #format is plain text
+        message_data = response[:message]
+        error = response[:message].split('=')[1]
       end
+
+
+      case error
+        when "MissingRegistration"
+          ex = Gcm::Errors::MissingRegistration.new(response[:message])
+          logger.warn("#{ex.message}, destroying gcm_device with id #{notification.device.id}")
+          notification.device.destroy
+        when "InvalidRegistration"
+          ex = Gcm::Errors::InvalidRegistration.new(response[:message])
+          logger.warn("#{ex.message}, destroying gcm_device with id #{notification.device.id}")
+          notification.device.destroy
+        when "MismatchedSenderId"
+          ex = Gcm::Errors::MismatchSenderId.new(response[:message])
+          logger.warn(ex.message)
+        when "NotRegistered"
+          ex = Gcm::Errors::NotRegistered.new(response[:message])
+          logger.warn("#{ex.message}, destroying gcm_device with id #{notification.device.id}")
+          notification.device.destroy
+        when "MessageTooBig"
+          ex = Gcm::Errors::MessageTooBig.new(response[:message])
+          logger.warn(ex.message)
+        else
+          notification.sent_at = Time.now
+          notification.save!
+      end
+    elsif response[:code] == 401
+      raise Gcm::Errors::InvalidAuthToken.new(message_data)
+    elsif response[:code] == 503
+      raise Gcm::Errors::ServiceUnavailable.new(message_data)
+    elsif response[:code] == 500
+      raise Gcm::Errors::InternalServerError.new(message_data)
     end
   end
 end
